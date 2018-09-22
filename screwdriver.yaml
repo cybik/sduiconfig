@@ -1,0 +1,37 @@
+shared:
+  image: node:8
+
+childPipelines:
+   scmUrls:
+      - git@github.com:cybik/ui.git
+jobs:
+  main:
+    environment:
+      COVERAGE: "true"
+      SD_SONAR_OPTS: "-Dsonar.sources=app -Dsonar.javascript.lcov.reportPath=coverage/lcov.info"
+    steps:
+      - install: npm install
+      - bower: npm install bower && ./node_modules/.bin/bower install --allow-root
+    requires:
+      - ~pr
+      - ~commit
+
+  # Publish the package to GitHub and build docker image
+  publish:
+    environment:
+      RELEASE_FILE: sdui.tgz
+    steps:
+      - setup-ci: git clone https://github.com/screwdriver-cd/toolbox.git ci
+      - install: npm install
+      - bower: npm install bower && ./node_modules/.bin/bower install --allow-root
+      - build: ./node_modules/.bin/ember build --environment production
+      - package: tar -C dist -cvzf $RELEASE_FILE .
+      - tag: ./ci/git-tag.sh
+      - publish: ./ci/git-release.sh
+    secrets:
+      # Pushing tags to Git
+      - GIT_KEY
+      # Pushing releases to GitHub
+      - GITHUB_TOKEN
+    requires:
+      - main
